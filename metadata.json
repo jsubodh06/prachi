@@ -1,0 +1,6 @@
+{
+  "name": "Nutrosa Bakery · Luxury Diwali Gifting Catalogue",
+  "description": "Artisanal cookies, festive hampers, and bespoke corporate Diwali gifting by Nutrosa Bakery.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
