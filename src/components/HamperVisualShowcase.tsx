@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { HamperItem } from '../types';
 import { getCustomHamperImages, saveCustomHamperImage, processUploadedImage } from '../utils/imageStorage';
-import { Camera, Check, Upload } from 'lucide-react';
+import { Camera, Check, Upload, Loader2 } from 'lucide-react';
 
 interface HamperVisualShowcaseProps {
   hamper: HamperItem;
@@ -18,12 +18,17 @@ export const HamperVisualShowcase: React.FC<HamperVisualShowcaseProps> = ({
 }) => {
   const { id } = hamper;
   const [customImage, setCustomImage] = useState<string | null>(null);
+  const [imageLoadError, setImageLoadError] = useState<boolean>(false);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
+    setImageLoadError(false);
     const updateImg = () => {
       const customMap = getCustomHamperImages();
       if (customMap[id]) {
         setCustomImage(customMap[id]);
+        setImageLoadError(false);
       } else {
         setCustomImage(null);
       }
@@ -36,12 +41,19 @@ export const HamperVisualShowcase: React.FC<HamperVisualShowcaseProps> = ({
 
   const handleDirectFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (file) {
       try {
+        setIsUploading(true);
         const dataUrl = await processUploadedImage(file);
         saveCustomHamperImage(id, dataUrl);
-      } catch (err) {
+        setCustomImage(dataUrl);
+        setImageLoadError(false);
+      } catch (err: any) {
         console.error('Failed to process image', err);
+        alert(err?.message || 'Failed to process image. Please choose a standard JPG, PNG, or WebP photo.');
+      } finally {
+        setIsUploading(false);
       }
     }
   };
@@ -91,11 +103,12 @@ export const HamperVisualShowcase: React.FC<HamperVisualShowcaseProps> = ({
         </svg>
       </div>
 
-      {customImage ? (
+      {customImage && !imageLoadError ? (
         <div className="relative w-full h-full overflow-hidden">
           <img
             src={customImage}
             alt={hamper.title}
+            onError={() => setImageLoadError(true)}
             className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/20 pointer-events-none" />
@@ -769,20 +782,37 @@ export const HamperVisualShowcase: React.FC<HamperVisualShowcaseProps> = ({
       )}
 
       {/* Upload Brochure Photo Trigger Button */}
-      <label
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="image/*"
+        className="hidden"
+        onChange={handleDirectFileUpload}
         onClick={(e) => e.stopPropagation()}
-        className="absolute bottom-3 left-3 bg-stone-950/80 hover:bg-stone-900 text-stone-200 hover:text-amber-200 px-2 py-1 rounded-md text-[10px] font-semibold border border-amber-500/30 flex items-center gap-1 cursor-pointer transition-all backdrop-blur-md shadow-md z-10"
+      />
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          fileInputRef.current?.click();
+        }}
+        disabled={isUploading}
+        className="absolute bottom-3 left-3 bg-stone-950/85 hover:bg-stone-900 text-stone-200 hover:text-amber-200 px-2.5 py-1 rounded-md text-[10px] font-semibold border border-amber-500/30 flex items-center gap-1.5 cursor-pointer transition-all backdrop-blur-md shadow-md z-10 disabled:opacity-50"
         title="Upload authentic brochure photo for this hamper"
       >
-        <Camera className="w-3 h-3 text-amber-400" />
-        <span>{customImage ? 'Change Photo' : 'Upload Photo'}</span>
-        <input
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleDirectFileUpload}
-        />
-      </label>
+        {isUploading ? (
+          <>
+            <Loader2 className="w-3 h-3 animate-spin text-amber-400" />
+            <span>Saving...</span>
+          </>
+        ) : (
+          <>
+            <Camera className="w-3 h-3 text-amber-400" />
+            <span>{customImage ? 'Change Photo' : 'Upload Photo'}</span>
+          </>
+        )}
+      </button>
 
       {/* Floating Price Tag on Card */}
       <div className="absolute bottom-3 right-3 bg-stone-950/90 text-amber-300 backdrop-blur-md px-3 py-1.5 rounded-lg text-xs font-bold border border-amber-500/30 shadow-xl tabular-nums z-10">

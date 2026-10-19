@@ -22,6 +22,7 @@ export interface HamperItem {
   accentColor: string;
   graphicType: 'healthy-box' | 'candle-box' | 'trio-box' | 'rattan-chest' | 'pichwai-box' | 'cookies-pack' | 'gift-bag' | 'jute-bag' | 'jute-healthy' | 'mini-jute' | 'velvet-party' | 'truffles-box';
   pageNumber?: number;
+  customImage?: string;
 }
 
 export interface QuoteCartItem {

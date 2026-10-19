@@ -39,7 +39,8 @@ import {
   Image as ImageIcon,
   AlertCircle,
   TrendingDown,
-  Layers
+  Layers,
+  Loader2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { festiveAudio } from '../utils/festiveAudio';
@@ -82,6 +83,7 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const [editedPriceTiers, setEditedPriceTiers] = useState<PriceTier[]>([]);
   const [imageUrlInput, setImageUrlInput] = useState<string>('');
   const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [isDragging, setIsDragging] = useState<boolean>(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null);
 
   // Import / Export dialog
@@ -90,6 +92,26 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Curated sample photography presets for quick 1-click preview
+  const FESTIVE_SAMPLE_PHOTOS = [
+    {
+      name: 'Artisanal Cookies',
+      url: 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?auto=format&fit=crop&w=900&q=80'
+    },
+    {
+      name: 'Diwali Mithai & Bakes',
+      url: 'https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?auto=format&fit=crop&w=900&q=80'
+    },
+    {
+      name: 'Belgian Truffles',
+      url: 'https://images.unsplash.com/photo-1549007994-cb92caebd54b?auto=format&fit=crop&w=900&q=80'
+    },
+    {
+      name: 'Festive Keepsake',
+      url: 'https://images.unsplash.com/photo-1513519245088-0e12902e5a38?auto=format&fit=crop&w=900&q=80'
+    }
+  ];
 
   // Initialize selected hamper
   useEffect(() => {
@@ -229,28 +251,36 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
       saveCustomHamperImage(currentHamper.id, dataUrl);
       refreshCatalogue();
       festiveAudio.playSparkle();
-      confetti({ particleCount: 35, spread: 50, origin: { y: 0.6 } });
+      confetti({ particleCount: 40, spread: 55, origin: { y: 0.6 } });
       setSaveSuccessMsg(`New photo saved and locked onto "${currentHamper.title}"!`);
       setTimeout(() => setSaveSuccessMsg(null), 3500);
     } catch (err: any) {
-      console.error(err);
-      alert('Failed to process image file. Please choose a standard JPG, PNG, or WebP photo.');
+      console.error('Image upload failed', err);
+      alert(err?.message || 'Failed to process image file. Please choose a standard JPG, PNG, or WebP photo.');
     } finally {
       setIsUploading(false);
     }
   };
 
-  const handleApplyImageUrl = () => {
+  const handleApplyImageUrl = (urlToApply?: string) => {
     if (!currentHamper) return;
-    if (!imageUrlInput.trim()) {
-      alert('Please enter an image URL.');
+    const targetUrl = (typeof urlToApply === 'string' ? urlToApply : imageUrlInput).trim();
+    if (!targetUrl) {
+      alert('Please enter or select an image URL.');
       return;
     }
 
-    saveCustomHamperImage(currentHamper.id, imageUrlInput.trim());
+    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://') && !targetUrl.startsWith('data:image/')) {
+      alert('Please enter a valid web image URL (starting with https:// or http://).');
+      return;
+    }
+
+    saveCustomHamperImage(currentHamper.id, targetUrl);
+    setImageUrlInput(targetUrl);
     refreshCatalogue();
     festiveAudio.playSparkle();
-    setSaveSuccessMsg(`Image URL assigned to "${currentHamper.title}".`);
+    confetti({ particleCount: 30, spread: 45, origin: { y: 0.6 } });
+    setSaveSuccessMsg(`Image updated for "${currentHamper.title}".`);
     setTimeout(() => setSaveSuccessMsg(null), 3500);
   };
 
@@ -714,41 +744,94 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                     )}
                   </div>
 
-                  {/* Photo Preview Container */}
-                  <div className="relative rounded-2xl overflow-hidden border border-[#D5C6AF] shadow-md bg-stone-900 h-56 sm:h-64 flex items-center justify-center">
+                  {/* Photo Preview Container with Drag & Drop */}
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setIsDragging(true);
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      setIsDragging(false);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDragging(false);
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) handleImageFileUpload(file);
+                    }}
+                    className={`relative rounded-2xl overflow-hidden border shadow-md bg-stone-900 h-56 sm:h-64 flex items-center justify-center transition-all ${
+                      isDragging ? 'border-amber-400 ring-4 ring-amber-400/40 scale-[1.01]' : 'border-[#D5C6AF]'
+                    }`}
+                  >
                     <HamperVisualShowcase hamper={currentHamper} size="md" className="h-full" />
+                    {isDragging && (
+                      <div className="absolute inset-0 bg-stone-950/85 backdrop-blur-xs flex flex-col items-center justify-center text-amber-300 z-30 pointer-events-none">
+                        <Upload className="w-9 h-9 animate-bounce mb-2 text-amber-300" />
+                        <span className="text-xs font-bold tracking-wide">Drop photo here to upload</span>
+                      </div>
+                    )}
                   </div>
 
                   {/* Upload Controls */}
-                  <div className="space-y-3 bg-white p-4 rounded-2xl border border-[#E8DEC8]">
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setIsDragging(true);
+                    }}
+                    onDragLeave={(e) => {
+                      e.preventDefault();
+                      setIsDragging(false);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setIsDragging(false);
+                      const file = e.dataTransfer.files?.[0];
+                      if (file) handleImageFileUpload(file);
+                    }}
+                    className={`space-y-3 bg-white p-4 rounded-2xl border transition-all ${
+                      isDragging ? 'border-amber-500 bg-amber-50/50' : 'border-[#E8DEC8]'
+                    }`}
+                  >
                     {/* File Upload Button */}
                     <div>
                       <input
                         type="file"
                         ref={fileInputRef}
-                        accept="image/jpeg,image/png,image/webp"
+                        accept="image/*"
                         className="hidden"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
+                          e.target.value = '';
                           if (file) handleImageFileUpload(file);
                         }}
                       />
                       <button
+                        type="button"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={isUploading}
                         className="w-full py-2.5 bg-[#142C20] hover:bg-[#1a3829] text-amber-300 rounded-xl text-xs font-semibold shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                       >
-                        <Upload className="w-4 h-4" />
-                        <span>{isUploading ? 'Compressing & Saving...' : 'Upload Image File (JPG / PNG)'}</span>
+                        {isUploading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin text-amber-300" />
+                            <span>Compressing & Saving Photo...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4" />
+                            <span>Upload Image File (JPG / PNG / WebP)</span>
+                          </>
+                        )}
                       </button>
                       <p className="text-[10px] text-stone-500 text-center mt-1">
-                        Client-side compressed to high-res JPEG for instant loading.
+                        Drag & drop photo here or choose from your files.
                       </p>
                     </div>
 
                     <div className="flex items-center gap-2 text-stone-400 text-xs">
                       <div className="flex-1 border-t border-[#E8DEC8]" />
-                      <span>OR USE URL</span>
+                      <span>OR USE IMAGE URL</span>
                       <div className="flex-1 border-t border-[#E8DEC8]" />
                     </div>
 
@@ -766,7 +849,8 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                           />
                         </div>
                         <button
-                          onClick={handleApplyImageUrl}
+                          type="button"
+                          onClick={() => handleApplyImageUrl()}
                           className="px-3 py-2 bg-[#142C20] hover:bg-[#1a3829] text-white rounded-xl text-xs font-medium cursor-pointer"
                         >
                           Apply
@@ -774,9 +858,30 @@ export const AdminPanelModal: React.FC<AdminPanelModalProps> = ({
                       </div>
                     </div>
 
+                    {/* Sample Photography Presets */}
+                    <div className="pt-1">
+                      <div className="text-[10px] uppercase font-bold text-stone-500 tracking-wider mb-1.5">
+                        Sample Photography Presets:
+                      </div>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {FESTIVE_SAMPLE_PHOTOS.map((sample) => (
+                          <button
+                            key={sample.name}
+                            type="button"
+                            onClick={() => handleApplyImageUrl(sample.url)}
+                            className="px-2 py-1.5 rounded-lg border border-[#E8DEC8] hover:border-[#142C20] bg-[#FAF7F2] hover:bg-stone-100 text-[11px] font-medium text-stone-700 text-left truncate transition-colors cursor-pointer"
+                            title={`Use ${sample.name} photo`}
+                          >
+                            ✦ {sample.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     {/* Revert Image Button */}
                     {hasCustomImage(currentHamper.id) && (
                       <button
+                        type="button"
                         onClick={handleRemoveImage}
                         className="w-full py-1.5 text-stone-600 hover:text-red-700 text-xs font-medium transition-colors flex items-center justify-center gap-1 cursor-pointer"
                       >

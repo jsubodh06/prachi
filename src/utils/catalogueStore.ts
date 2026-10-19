@@ -63,17 +63,19 @@ export function resetAllPriceOverrides(): void {
 
 export function getMergedCatalogue(): HamperItem[] {
   const overrides = getPriceOverrides();
+  const customImages = getCustomHamperImages();
   return CATALOGUE_ITEMS.map((item) => {
     const override = overrides[item.id];
-    if (!override) return item;
+    const customImg = customImages[item.id];
     return {
       ...item,
-      basePrice: typeof override.basePrice === 'number' ? override.basePrice : item.basePrice,
-      minPrice: typeof override.minPrice === 'number' ? override.minPrice : item.minPrice,
+      basePrice: override && typeof override.basePrice === 'number' ? override.basePrice : item.basePrice,
+      minPrice: override && typeof override.minPrice === 'number' ? override.minPrice : item.minPrice,
       priceTiers:
-        Array.isArray(override.priceTiers) && override.priceTiers.length > 0
+        override && Array.isArray(override.priceTiers) && override.priceTiers.length > 0
           ? override.priceTiers
-          : item.priceTiers
+          : item.priceTiers,
+      customImage: customImg || undefined
     };
   });
 }

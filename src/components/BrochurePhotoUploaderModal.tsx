@@ -7,7 +7,7 @@ import {
   removeCustomHamperImage,
   processUploadedImage
 } from '../utils/imageStorage';
-import { X, Upload, Check, Trash2, Camera, Sparkles, Image as ImageIcon } from 'lucide-react';
+import { X, Upload, Check, Trash2, Camera, Sparkles, Image as ImageIcon, Loader2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface BrochurePhotoUploaderModalProps {
@@ -23,6 +23,7 @@ export const BrochurePhotoUploaderModal: React.FC<BrochurePhotoUploaderModalProp
 }) => {
   const [imagesMap, setImagesMap] = useState<Record<string, string>>({});
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   const reloadImages = () => {
     setImagesMap(getCustomHamperImages());
@@ -47,9 +48,9 @@ export const BrochurePhotoUploaderModal: React.FC<BrochurePhotoUploaderModalProp
         spread: 50,
         origin: { y: 0.6 }
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Upload failed', err);
-      alert('Could not process this image. Please upload a standard JPG or PNG file.');
+      alert(err?.message || 'Could not process this image. Please upload a standard JPG, PNG, or WebP photo.');
     } finally {
       setUploadingId(null);
     }
@@ -95,7 +96,7 @@ export const BrochurePhotoUploaderModal: React.FC<BrochurePhotoUploaderModalProp
               How to place your authentic photos:
             </strong>
             <p>
-              Upload the original high-resolution photo from your phone or photoshoot for each hamper below. Your photo is automatically optimized and permanently locked onto that hamper across all store cards, modals, and the digital flipbook.
+              Upload or drag & drop high-resolution photos for each hamper below. Your photos are automatically compressed client-side, loaded instantly, and locked across all store cards, modals, and the digital flipbook.
             </p>
           </div>
 
@@ -104,11 +105,30 @@ export const BrochurePhotoUploaderModal: React.FC<BrochurePhotoUploaderModalProp
             {hampersToDisplay.map((hamper) => {
               const hasCustomPhoto = Boolean(imagesMap[hamper.id]);
               const isUploading = uploadingId === hamper.id;
+              const isDragging = dragOverId === hamper.id;
 
               return (
                 <div
                   key={hamper.id}
-                  className="bg-white rounded-xl border border-[#E8DEC8] p-4 flex gap-4 items-center justify-between shadow-xs hover:border-[#142C20] transition-colors"
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragOverId(hamper.id);
+                  }}
+                  onDragLeave={(e) => {
+                    e.preventDefault();
+                    setDragOverId(null);
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOverId(null);
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) handleFileUpload(hamper.id, file);
+                  }}
+                  className={`bg-white rounded-xl border p-4 flex gap-4 items-center justify-between shadow-xs transition-all ${
+                    isDragging
+                      ? 'border-amber-500 bg-amber-50/60 ring-2 ring-amber-400'
+                      : 'border-[#E8DEC8] hover:border-[#142C20]'
+                  }`}
                 >
                   {/* Photo Thumbnail */}
                   <div className="w-24 h-24 rounded-lg overflow-hidden shrink-0 bg-stone-900 relative border border-stone-200 flex items-center justify-center">
@@ -130,6 +150,12 @@ export const BrochurePhotoUploaderModal: React.FC<BrochurePhotoUploaderModalProp
                         <Check className="w-3 h-3" />
                       </div>
                     )}
+
+                    {isUploading && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-amber-300">
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      </div>
+                    )}
                   </div>
 
                   {/* Hamper Info & Uploader */}
@@ -142,22 +168,39 @@ export const BrochurePhotoUploaderModal: React.FC<BrochurePhotoUploaderModalProp
                     </p>
 
                     <div className="pt-1 flex items-center gap-2">
-                      <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#142C20] hover:bg-[#1C3E2D] text-amber-300 rounded-lg text-xs font-semibold transition-all shadow-xs">
-                        <Upload className="w-3.5 h-3.5" />
-                        <span>{isUploading ? 'Saving...' : hasCustomPhoto ? 'Replace Photo' : 'Upload Photo'}</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleFileUpload(hamper.id, file);
-                          }}
-                        />
-                      </label>
+                      <input
+                        type="file"
+                        id={`photo-input-${hamper.id}`}
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          e.target.value = '';
+                          if (file) handleFileUpload(hamper.id, file);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => document.getElementById(`photo-input-${hamper.id}`)?.click()}
+                        disabled={isUploading}
+                        className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#142C20] hover:bg-[#1C3E2D] text-amber-300 rounded-lg text-xs font-semibold transition-all shadow-xs disabled:opacity-50"
+                      >
+                        {isUploading ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Processing...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>{hasCustomPhoto ? 'Replace Photo' : 'Upload Photo'}</span>
+                          </>
+                        )}
+                      </button>
 
                       {hasCustomPhoto && (
                         <button
+                          type="button"
                           onClick={() => handleRemove(hamper.id)}
                           className="p-1.5 text-stone-400 hover:text-red-600 transition-colors cursor-pointer"
                           title="Reset to default render"
